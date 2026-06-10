@@ -1,28 +1,37 @@
+
+// in CLI compile to temporary binary and execute (when developing)
+// go run main.go
+
+// in CLI rebuild and run 
+// go build -o out && ./out
+
 package main
 
 import (
 	"net/http"
-	"fmt"
-	"os"
+	"log"
 )
 
 func main() {
 	
+	// create directory reference
+	dirRef := http.Dir(".")
+	fileServHandler:= http.FileServer(dirRef)
+	
 	// create HTTP request router and multiplexer 
-	newServeMux := http.NewServeMux()
+	serveMux := http.NewServeMux()
+	serveMux.Handle("/", fileServHandler)
 
 	// define configuration and behavior for running an active HTTP server
 	serveStruct := http.Server{
 		Addr: ":8080",
-		Handler: newServeMux,
+		Handler: serveMux,
 	}
 
 	// start the server
 	err := serveStruct.ListenAndServe()
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
-
 }
 
