@@ -12,12 +12,49 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"log"
+	"sync/atomic"
 )
 
-// healthzHandler responds to readiness checks.
-// Returns 200 OK with a plain text body to indicate the server is ready.
+// hold any stateful, in-memory data
+type apiConfig struct {
+	fileserverHits atomic.Int32 // safely increment, read integer value across multiple goroutines (HTTP requests)
+}
+
+// middleware method that increments the fileserverHits counter every time called
+func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        cfg.fileserverHits.Add(1)
+        next.ServeHTTP(w, r)
+    })
+}
+
+// reset method
+func (cfg *apiConfig) resetHandler(w http.ResponseWriter, r *http.Request) {
+    // set the response header and status code
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+
+    // reset fileserverHits to 0 using the atomic method:
+    cfg.fileserverHits.Store(0)
+}
+
+// metrics method 
+// writes the number of requests that have been counted as plain text in this format to the HTTP response
+func (cfg *apiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
+	// set the response header and status code
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+
+    // writes the number of requests that have been counted as plain text in this format to the HTTP response
+	hits := cfg.fileserverHits.Load()
+	w.Write([]byte(fmt.Sprintf("Hits: %d", hits)))
+}
+
+// healthzHandler responds to readiness checks
+// returns 200 OK with a plain text body to indicate the server is ready
 func healthzHandler(w http.ResponseWriter, r *http.Request) {
 	
 	// set a response header
@@ -32,16 +69,27 @@ func healthzHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
+	// instantiate api config
+	apiCfg := apiConfig{
+		fileserverHits: atomic.Int32{},
+	}
+
 	// create directory reference
 	dirRef := http.Dir(".")
 	fileServHandler:= http.FileServer(dirRef)
 	
 	// create HTTP request router and multiplexer 
 	serveMux := http.NewServeMux()
-	serveMux.Handle("/app/", http.StripPrefix("/app", fileServHandler))
+	serveMux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", fileServHandler)))
 
 	// register healthz handler
-	serveMux.HandleFunc("/healthz", healthzHandler)
+	serveMux.HandleFunc("GET /api/healthz", healthzHandler)
+
+	// register request handler
+	serveMux.HandleFunc("GET /api/metrics", apiCfg.metricsHandler)
+
+	// register reset handler
+	serveMux.HandleFunc("POST /api/reset", apiCfg.resetHandler)
 
 	// define configuration and behavior for running an active HTTP server
 	serveStruct := http.Server{
