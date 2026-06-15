@@ -45,12 +45,12 @@ func (cfg *apiConfig) resetHandler(w http.ResponseWriter, r *http.Request) {
 // writes the number of requests that have been counted as plain text in this format to the HTTP response
 func (cfg *apiConfig) metricsHandler(w http.ResponseWriter, r *http.Request) {
 	// set the response header and status code
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 
     // writes the number of requests that have been counted as plain text in this format to the HTTP response
 	hits := cfg.fileserverHits.Load()
-	w.Write([]byte(fmt.Sprintf("Hits: %d", hits)))
+	w.Write([]byte(fmt.Sprintf("<html><body><h1>Welcome, Chirpy Admin</h1><p>Chirpy has been visited %d times!</p></body></html>", hits)))
 }
 
 // healthzHandler responds to readiness checks
@@ -86,10 +86,10 @@ func main() {
 	serveMux.HandleFunc("GET /api/healthz", healthzHandler)
 
 	// register request handler
-	serveMux.HandleFunc("GET /api/metrics", apiCfg.metricsHandler)
+	serveMux.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
 
 	// register reset handler
-	serveMux.HandleFunc("POST /api/reset", apiCfg.resetHandler)
+	serveMux.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
 
 	// define configuration and behavior for running an active HTTP server
 	serveStruct := http.Server{
