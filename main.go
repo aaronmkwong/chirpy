@@ -17,6 +17,7 @@ import (
 	"log"
 	"sync/atomic"
 	"encoding/json"
+	"strings"
 )
 
 // hold any stateful, in-memory data
@@ -68,8 +69,27 @@ func healthzHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK"))
 }
 
-// decodes and validates an incoming chirp body.
-// ensures the chirp is 140 characters or less.
+// replaces forbidden words with asterisks
+// used by handlerChirpsValidate
+func CleanChirp(chirp string) string {
+	badWords := map[string]bool{
+		"kerfuffle": true,
+		"sharbert":  true,
+		"fornax":    true,
+	}
+
+	words := strings.Split(chirp, " ")
+
+	for i, word := range words {
+		if badWords[strings.ToLower(word)] {
+			words[i] = "****"
+		}
+	}
+
+	return strings.Join(words, " ")
+}
+
+// decodes and validates incoming chirp body and ensures chirp is 140 characters or less
 func handlerChirpsValidate(w http.ResponseWriter, r *http.Request){
 
 	// parsing the incoming request
@@ -77,14 +97,15 @@ func handlerChirpsValidate(w http.ResponseWriter, r *http.Request){
     	Body string `json:"body"`
 	}
 
-	// sending back a success response
-	type successResponse struct {
-		Valid bool `json:"valid"`
-	}
 
 	// sending back an error response
 	type errorResponse struct {
 		Error string `json:"error"`
+	}	
+
+	// cleaning bad words and success response 
+	type successResponse struct {
+    	CleanedBody string `json:"cleaned_body"`  
 	}	
 	
     decoder := json.NewDecoder(r.Body)
@@ -116,11 +137,11 @@ func handlerChirpsValidate(w http.ResponseWriter, r *http.Request){
 		return
 	}
 	
-    // create success response struct
-    respBody := successResponse{
-        Valid: true,
-    }
-    
+	// clean profane words and build success response
+		respBody := successResponse{
+		CleanedBody: CleanChirp(params.Body),
+	}
+
     // marshal to JSON bytes
     dat, err := json.Marshal(respBody)
     if err != nil {
