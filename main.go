@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"log"
 	"sync/atomic"
+	"encoding/json"
 )
 
 // hold any stateful, in-memory data
@@ -67,6 +68,72 @@ func healthzHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("OK"))
 }
 
+// decodes and validates an incoming chirp body.
+// ensures the chirp is 140 characters or less.
+func handlerChirpsValidate(w http.ResponseWriter, r *http.Request){
+
+	// parsing the incoming request
+	type parameters struct {
+    	Body string `json:"body"`
+	}
+
+	// sending back a success response
+	type successResponse struct {
+		Valid bool `json:"valid"`
+	}
+
+	// sending back an error response
+	type errorResponse struct {
+		Error string `json:"error"`
+	}	
+	
+    decoder := json.NewDecoder(r.Body)
+    params := parameters{}
+    err := decoder.Decode(&params)
+    if err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		w.WriteHeader(500)
+		return
+    }
+
+	if len(params.Body) > 140 {
+		// create error response struct
+		respBody := errorResponse{
+			Error: "Chirp is too long",
+		}
+		
+		// marshal to JSON bytes
+		dat, err := json.Marshal(respBody)
+		if err != nil {
+			w.WriteHeader(500)
+			return
+		}
+		
+		// write headers and the response data back to the client
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(400) // 400 Bad Request
+		w.Write(dat)
+		return
+	}
+	
+    // create success response struct
+    respBody := successResponse{
+        Valid: true,
+    }
+    
+    // marshal to JSON bytes
+    dat, err := json.Marshal(respBody)
+    if err != nil {
+        w.WriteHeader(500)
+        return
+    }
+
+    // write headers and response data back to the client
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(200)
+    w.Write(dat)	
+}
+
 func main() {
 
 	// instantiate api config
@@ -90,6 +157,9 @@ func main() {
 
 	// register reset handler
 	serveMux.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
+
+	// register chirps validate handler 
+	serveMux.HandleFunc("POST /api/validate_chirp", handlerChirpsValidate)
 
 	// define configuration and behavior for running an active HTTP server
 	serveStruct := http.Server{
