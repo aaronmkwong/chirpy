@@ -18,11 +18,17 @@ import (
 	"sync/atomic"
 	"encoding/json"
 	"strings"
+	"database/sql"
+	"os"
+	"github.com/joho/godotenv"
+	"github.com/aaronmkwong/chirpy/internal/database"
+	_ "github.com/lib/pq"  // Import the PostgreSQL driver anonymously for its side effects (registering the driver)
 )
 
 // hold any stateful, in-memory data
 type apiConfig struct {
 	fileserverHits atomic.Int32 // safely increment, read integer value across multiple goroutines (HTTP requests)
+	DB *database.Queries
 }
 
 // middleware method that increments the fileserverHits counter every time called
@@ -157,8 +163,35 @@ func handlerChirpsValidate(w http.ResponseWriter, r *http.Request){
 
 func main() {
 
+	// load environment variables safely
+	err := godotenv.Load()
+		if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+
+	dbURL := os.Getenv("DB_URL")
+		if dbURL == "" {
+		log.Fatal("DB_URL environment variable is not set")
+	}
+
+	// open database connection
+	db, err := sql.Open("postgres", dbURL)
+		if err != nil {
+		log.Fatalf("Error opening database: %v", err)
+	}
+
+	// verify the connection works
+	err = db.Ping()
+		if err != nil {
+		log.Fatalf("Error connecting to the database: %v", err)
+	}
+
+	// initialize queries
+	dbQueries := database.New(db)
+
 	// instantiate api config
 	apiCfg := apiConfig{
+		DB: dbQueries,
 		fileserverHits: atomic.Int32{},
 	}
 
@@ -189,7 +222,7 @@ func main() {
 	}
 
 	// start the server
-	err := serveStruct.ListenAndServe()
+	err = serveStruct.ListenAndServe()
 	if err != nil {
 		log.Fatal(err)
 	}
