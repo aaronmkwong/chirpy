@@ -26,6 +26,7 @@ import (
 type apiConfig struct {
 	fileserverHits atomic.Int32 // safely increment, read integer value across multiple goroutines (HTTP requests)
 	db *database.Queries
+	platform string
 }
 
 func main() {
@@ -60,6 +61,7 @@ func main() {
 	apiCfg := apiConfig{
 		db: dbQueries,
 		fileserverHits: atomic.Int32{},
+		platform: os.Getenv("PLATFORM"),
 	}
 
 	// create directory reference
@@ -81,6 +83,9 @@ func main() {
 
 	// register chirps validate handler 
 	serveMux.HandleFunc("POST /api/validate_chirp", handlerChirpsValidate)
+
+	// register create user handler
+	serveMux.HandleFunc("POST /api/users", apiCfg.handlerUserCreate)
 
 	// define configuration and behavior for running an active HTTP server
 	serveStruct := http.Server{
