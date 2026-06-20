@@ -1,4 +1,3 @@
-
 // in CLI compile to temporary binary and execute (when developing)
 // go run main.go
 
