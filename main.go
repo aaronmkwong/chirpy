@@ -82,7 +82,7 @@ func main() {
 	serveMux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
 
 	// register chirps validate handler 
-	serveMux.HandleFunc("POST /api/validate_chirp", handlerChirpsValidate)
+	serveMux.HandleFunc("POST /api/chirps", apiCfg.handlerChirpsCreate)
 
 	// register create user handler
 	serveMux.HandleFunc("POST /api/users", apiCfg.handlerUserCreate)
