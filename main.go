@@ -86,9 +86,12 @@ func main() {
 	// register create user handler
 	serveMux.HandleFunc("POST /api/users", apiCfg.handlerUserCreate)
 
-	// register get chirp handler
+	// register get many chirps handler
 	serveMux.HandleFunc("GET /api/chirps", apiCfg.handlerChirpsGet)
 
+	// register get single chirp handler
+	serveMux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handlerChirpGet)
+	
 	// define configuration and behavior for running an active HTTP server
 	serveStruct := http.Server{
 		Addr: ":8080",

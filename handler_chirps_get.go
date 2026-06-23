@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"github.com/google/uuid"
 )
 
 // handlerChirpsGet retrieves all chirps from the database, sorts them,
@@ -37,4 +38,55 @@ func (cfg *apiConfig) handlerChirpsGet(
 
 	// Send the mapped slice back to the client as a JSON response
 	respondWithJSON(w, http.StatusOK, chirps)
+}
+
+// handlerChirpGet retrieves a single chirp by ID and returns it as JSON.
+func (cfg *apiConfig) handlerChirpGet(
+w http.ResponseWriter,
+r *http.Request,
+) {
+// Get the chirp ID from the URL path parameter
+chirpIDString := r.PathValue("chirpID")
+
+// Convert the string ID to a UUID
+chirpID, err := uuid.Parse(chirpIDString)
+if err != nil {
+	respondWithError(
+		w,
+		http.StatusNotFound,
+		"Chirp not found",
+	)
+	return
+}
+
+// Query the chirp from the database
+dbChirp, err := cfg.db.GetChirp(
+	r.Context(),
+	chirpID,
+)
+if err != nil {
+	respondWithError(
+		w,
+		http.StatusNotFound,
+		"Chirp not found",
+	)
+	return
+}
+
+// Map the database model to our API-facing structure
+chirp := Chirp{
+	ID:        dbChirp.ID,
+	CreatedAt: dbChirp.CreatedAt,
+	UpdatedAt: dbChirp.UpdatedAt,
+	Body:      dbChirp.Body,
+	UserID:    dbChirp.UserID,
+}
+
+// Return the chirp as JSON
+respondWithJSON(
+	w,
+	http.StatusOK,
+	chirp,
+)
+
 }
