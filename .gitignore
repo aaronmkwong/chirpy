@@ -18,3 +18,6 @@ coverage.out
 
 # Environment with keys
 .env
+
+# Go build cache
+*.test

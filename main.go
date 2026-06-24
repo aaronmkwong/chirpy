@@ -91,6 +91,9 @@ func main() {
 
 	// register get single chirp handler
 	serveMux.HandleFunc("GET /api/chirps/{chirpID}", apiCfg.handlerChirpGet)
+
+	// register login handler
+	serveMux.HandleFunc("POST /api/login", apiCfg.handlerLogin)
 	
 	// define configuration and behavior for running an active HTTP server
 	serveStruct := http.Server{

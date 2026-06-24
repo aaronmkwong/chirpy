@@ -5,13 +5,15 @@ import (
 	"net/http"
 	"time"
 	"log"
-
+	"github.com/aaronmkwong/chirpy/internal/database"
+	"github.com/aaronmkwong/chirpy/internal/auth"
 	"github.com/google/uuid"
 )
 
 // Request body structure
 type requestParameters struct {
 	Email string `json:"email"`
+	Password string `json:"password"`
 }
 
 // Internal User structure to control JSON output format
@@ -31,8 +33,15 @@ func (cfg *apiConfig) handlerUserCreate(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// hash the password before storing it in the database
+	hashedPassword, err := auth.HashPassword(params.Password)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Could not hash password")
+		return
+	}
+
 	// call the SQLC-generated CreateUser database method
-	dbUser, err := cfg.db.CreateUser(r.Context(), params.Email)
+	dbUser, err := cfg.db.CreateUser(r.Context(), database.CreateUserParams{Email: params.Email,HashedPassword: hashedPassword,})
 	if err != nil {
 		log.Printf("Error creating user: %s", err)
 		respondWithError(w, http.StatusInternalServerError, "Could not create user")
