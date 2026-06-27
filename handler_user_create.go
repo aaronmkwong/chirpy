@@ -2,17 +2,17 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/aaronmkwong/chirpy/internal/auth"
+	"github.com/aaronmkwong/chirpy/internal/database"
+	"github.com/google/uuid"
+	"log"
 	"net/http"
 	"time"
-	"log"
-	"github.com/aaronmkwong/chirpy/internal/database"
-	"github.com/aaronmkwong/chirpy/internal/auth"
-	"github.com/google/uuid"
 )
 
 // Request body structure
 type requestParameters struct {
-	Email string `json:"email"`
+	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
@@ -41,7 +41,7 @@ func (cfg *apiConfig) handlerUserCreate(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// call the SQLC-generated CreateUser database method
-	dbUser, err := cfg.db.CreateUser(r.Context(), database.CreateUserParams{Email: params.Email,HashedPassword: hashedPassword,})
+	dbUser, err := cfg.db.CreateUser(r.Context(), database.CreateUserParams{Email: params.Email, HashedPassword: hashedPassword})
 	if err != nil {
 		log.Printf("Error creating user: %s", err)
 		respondWithError(w, http.StatusInternalServerError, "Could not create user")

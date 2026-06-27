@@ -1,9 +1,8 @@
 // in CLI compile to temporary binary and execute (when developing)
 // go run main.go
 
-// in CLI rebuild and run 
+// in CLI rebuild and run
 // go build -o out && ./out
-
 
 // in CLI send signal to server to stop and exit
 // CTRL + C
@@ -11,63 +10,78 @@
 package main
 
 import (
-	"net/http"
-	"log"
-	"sync/atomic"
 	"database/sql"
+	"log"
+	"net/http"
 	"os"
-	"github.com/joho/godotenv"
+	"sync/atomic"
+
 	"github.com/aaronmkwong/chirpy/internal/database"
-	_ "github.com/lib/pq"  // Import the PostgreSQL driver anonymously for its side effects (registering the driver)
+	"github.com/joho/godotenv"
+	_ "github.com/lib/pq" // Import the PostgreSQL driver anonymously for its side effects (registering the driver)
 )
 
 // hold any stateful, in-memory data
 type apiConfig struct {
 	fileserverHits atomic.Int32 // safely increment, read integer value across multiple goroutines (HTTP requests)
-	db *database.Queries
-	platform string
+	db             *database.Queries
+	platform       string
+	jwtSecret      string
 }
 
 func main() {
 
 	// load environment variables safely
 	err := godotenv.Load()
-		if err != nil {
+	if err != nil {
 		log.Fatalf("Error loading .env file: %v", err)
 	}
 
 	dbURL := os.Getenv("DB_URL")
-		if dbURL == "" {
+	if dbURL == "" {
 		log.Fatal("DB_URL environment variable is not set")
 	}
 
 	// open database connection
 	db, err := sql.Open("postgres", dbURL)
-		if err != nil {
+	if err != nil {
 		log.Fatalf("Error opening database: %v", err)
 	}
 
 	// verify the connection works
 	err = db.Ping()
-		if err != nil {
+	if err != nil {
 		log.Fatalf("Error connecting to the database: %v", err)
 	}
 
 	// initialize queries
 	dbQueries := database.New(db)
 
+	// load the JWT secret from .env file
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET must be set")
+	}
+
+	// load platform from .env file
+	platform := os.Getenv("PLATFORM")
+	if platform == "" {
+		log.Fatal("PLATFORM must be set")
+	}
+
 	// instantiate api config
 	apiCfg := apiConfig{
-		db: dbQueries,
+		db:             dbQueries,
 		fileserverHits: atomic.Int32{},
-		platform: os.Getenv("PLATFORM"),
+		platform:       platform,
+		jwtSecret:      jwtSecret,
 	}
 
 	// create directory reference
 	dirRef := http.Dir(".")
-	fileServHandler:= http.FileServer(dirRef)
-	
-	// create HTTP request router and multiplexer 
+	fileServHandler := http.FileServer(dirRef)
+
+	// create HTTP request router and multiplexer
 	serveMux := http.NewServeMux()
 	serveMux.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", fileServHandler)))
 
@@ -80,7 +94,7 @@ func main() {
 	// register reset handler
 	serveMux.HandleFunc("POST /admin/reset", apiCfg.handlerReset)
 
-	// register chirps validate handler 
+	// register chirps validate handler
 	serveMux.HandleFunc("POST /api/chirps", apiCfg.handlerChirpsCreate)
 
 	// register create user handler
@@ -94,10 +108,10 @@ func main() {
 
 	// register login handler
 	serveMux.HandleFunc("POST /api/login", apiCfg.handlerLogin)
-	
+
 	// define configuration and behavior for running an active HTTP server
 	serveStruct := http.Server{
-		Addr: ":8080",
+		Addr:    ":8080",
 		Handler: serveMux,
 	}
 
@@ -107,4 +121,3 @@ func main() {
 		log.Fatal(err)
 	}
 }
-

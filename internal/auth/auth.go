@@ -4,6 +4,8 @@ import (
 	"time"
 	"fmt"
 	"errors"
+	"net/http"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -19,7 +21,7 @@ func HashPassword(password string) (string, error) {
 }
 
 // CheckPasswordHash compares a plaintext password against a stored hash.
-func CheckPasswordHash(password string, hash string,) (bool, error) {
+func CheckPasswordHash(password string, hash string) (bool, error) {
 	return argon2id.ComparePasswordAndHash(
 	password,
 	hash,
@@ -86,4 +88,25 @@ func ValidateJWT(tokenString, tokenSecret string) (uuid.UUID, error) {
 	}
 
 	return userID, nil
+}
+
+// GetBearerToken extracts the bearer token from the Authorization header.
+func GetBearerToken(headers http.Header) (string, error) {
+
+	// Retrieve the Authorization header
+	authHeader := headers.Get("Authorization")
+	if authHeader == "" {
+		return "", errors.New("authorization header not found")
+	}
+
+	// Split the header into whitespace-separated fields
+	parts := strings.Fields(authHeader)
+
+	// Validate the bearer token format
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return "", errors.New("invalid authorization header")
+	}
+
+	// Return the bearer token
+	return parts[1], nil
 }
