@@ -1,27 +1,29 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/aaronmkwong/chirpy/internal/auth"
+	"github.com/aaronmkwong/chirpy/internal/database"
 )
 
-// handlerLogin authenticates a user using email and password.
+// handlerLogin authenticates a user and returns both an access token and a refresh token.
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 
 	// Request body structure
 	type parameters struct {
-		Password         string `json:"password"`
-		Email            string `json:"email"`
-		ExpiresInSeconds int    `json:"expires_in_seconds"`
+		Password string `json:"password"`
+		Email    string `json:"email"`
 	}
 
 	// Response structure
 	type loginResponse struct {
 		User
-		Token string `json:"token"`
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	// Decode request body
@@ -66,31 +68,46 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Default JWT lifetime to one hour
-	expiresIn := time.Hour
-
-	// Use the requested expiration if it is positive and does not exceed one hour
-	if params.ExpiresInSeconds > 0 &&
-		params.ExpiresInSeconds <= int(time.Hour.Seconds()) {
-		expiresIn = time.Duration(params.ExpiresInSeconds) * time.Second
-	}
-
-	// Create JWT
+	// Create JWT access token (always expires after one hour)
 	token, err := auth.MakeJWT(
 		user.ID,
 		cfg.jwtSecret,
-		expiresIn,
+		time.Hour,
 	)
 	if err != nil {
 		respondWithError(
 			w,
 			http.StatusInternalServerError,
-			"Couldn't create token",
+			"Couldn't create access token",
 		)
 		return
 	}
 
-	// Return authenticated user with JWT
+	// Generate a refresh token
+	refreshToken := auth.MakeRefreshToken()
+
+	// Store the refresh token in the database
+	_, err = cfg.db.CreateRefreshToken(
+		r.Context(),
+		database.CreateRefreshTokenParams{
+			Token:      refreshToken,
+			CreatedAt:  time.Now().UTC(),
+			UpdatedAt:  time.Now().UTC(),
+			UserID:     user.ID,
+			ExpiresAt:  time.Now().UTC().Add(60 * 24 * time.Hour),
+			RevokedAt:  sql.NullTime{},
+		},
+	)
+	if err != nil {
+		respondWithError(
+			w,
+			http.StatusInternalServerError,
+			"Couldn't create refresh token",
+		)
+		return
+	}
+
+	// Return authenticated user with both tokens
 	respondWithJSON(
 		w,
 		http.StatusOK,
@@ -101,7 +118,8 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 				UpdatedAt: user.UpdatedAt,
 				Email:     user.Email,
 			},
-			Token: token,
+			Token:        token,
+			RefreshToken: refreshToken,
 		},
 	)
 }

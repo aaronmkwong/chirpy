@@ -6,6 +6,8 @@ import (
 	"errors"
 	"net/http"
 	"strings"
+	"crypto/rand"
+	"encoding/hex"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -109,4 +111,22 @@ func GetBearerToken(headers http.Header) (string, error) {
 
 	// Return the bearer token
 	return parts[1], nil
+}
+
+// MakeRefreshToken generates a random 256-bit (32-byte) refresh token.
+func MakeRefreshToken() string {
+
+	// Allocate 32 bytes (256 bits) of random data.
+	randomBytes := make([]byte, 32)
+
+	// Fill the slice with cryptographically secure random bytes.
+	_, err := rand.Read(randomBytes)
+	if err != nil {
+		// crypto/rand.Read should almost never fail.
+		// Panic here because callers cannot reasonably recover.
+		panic(err)
+	}
+
+	// Return the random bytes as a hex-encoded string.
+	return hex.EncodeToString(randomBytes)
 }
