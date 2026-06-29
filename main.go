@@ -115,6 +115,9 @@ func main() {
 	// register revoke handler
 	serveMux.HandleFunc("POST /api/revoke", apiCfg.handlerRevoke)
 
+	// register update user handler
+	serveMux.HandleFunc("PUT /api/users", apiCfg.handlerUserUpdate)
+
 	// define configuration and behavior for running an active HTTP server
 	serveStruct := http.Server{
 		Addr:    ":8080",
