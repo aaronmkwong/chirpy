@@ -118,6 +118,9 @@ func main() {
 	// register update user handler
 	serveMux.HandleFunc("PUT /api/users", apiCfg.handlerUserUpdate)
 
+	// register delete chirp handler
+	serveMux.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.handlerChirpDelete)
+
 	// define configuration and behavior for running an active HTTP server
 	serveStruct := http.Server{
 		Addr:    ":8080",
